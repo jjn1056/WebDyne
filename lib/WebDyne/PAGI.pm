@@ -303,10 +303,8 @@ sub handler_sse {
                 die $@ unless $read || $disconnected || $size > $WEBDYNE_CGI_POST_MAX;
             }
             if ($size > $WEBDYNE_CGI_POST_MAX) {
-                await $send->({type => 'sse.http.response.start', status => HTTP_REQUEST_ENTITY_TOO_LARGE,
-                    headers => [['content-type', 'text/plain']]});
-                await $send->({type => 'sse.http.response.body', body => "Request body exceeds upload limit\n", more => 0});
-                return;
+                return await send_http_response($send, HTTP_REQUEST_ENTITY_TOO_LARGE,
+                    [['content-type', 'text/plain']], "Request body exceeds upload limit\n");
             }
             return if $disconnected;
         }
@@ -340,15 +338,8 @@ sub handler_sse {
             $status=HTTP_INTERNAL_SERVER_ERROR
                 unless defined($status) && $status =~ /\A[45][0-9]{2}\z/;
             my $message=HTTP::Status::status_message($status) || 'Request failed';
-            await $send->({
-                type => 'sse.http.response.start', status => $status,
-                headers => [['content-type', 'text/plain']],
-            });
-            await $send->({
-                type => 'sse.http.response.body',
-                body => "$status $message\n", more => 0,
-            });
-            return;
+            return await send_http_response($send, $status,
+                [['content-type', 'text/plain']], "$status $message\n");
         }
         await $sse_cr->($scope, $receive, $send);
     };
@@ -432,12 +423,13 @@ sub handler_ws {
         return $ws_cr if ref($ws_cr) eq 'CODE';
     }
 
-    #  Reject before accepting the socket. The server converts this into
-    #  an HTTP 403 handshake response; no optional extension is required.
+    #  Refuse before accepting the socket. A refusal is an ordinary HTTP
+    #  response sent in place of websocket.accept.
     #
     return async sub {
         my ($scope, $receive, $send)=@_;
-        await $send->({type => 'websocket.close'});
+        await send_http_response($send, HTTP_FORBIDDEN,
+            [['content-type', 'text/plain']], "403 Forbidden\n");
     };
 
 }
