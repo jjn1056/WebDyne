@@ -12,7 +12,6 @@ use WebDyne::Request::PAGI;
 my $wr = WebDyne::Request::PAGI->new(
     scope => $scope,
     req   => $pagi_request,
-    res   => $pagi_response,
 );
 ```
 

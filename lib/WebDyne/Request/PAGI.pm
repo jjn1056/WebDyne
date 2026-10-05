@@ -183,7 +183,7 @@ sub init {
     
     #  Implement and return
     #
-    foreach my $handler (qw(req res sse ws)) {
+    foreach my $handler (qw(req sse ws)) {
         *{$handler}=sub { return shift()->{$handler} };
     }
     return handler_methods_init(__PACKAGE__, 'PAGI::Request', \%method);
@@ -431,13 +431,8 @@ sub headers_in {
 
 sub headers_out {
     my $r=shift();
-    my $headers_or=$r->{'headers_out'}
-        ||= HTTP::Headers::Fast->new(map { @{$_} } @{$r->{'res'}->headers()});
-    if (@_) {
-        $r->{'res'}->header(@_);
-        return $headers_or->header(@_);
-    }
-    return $headers_or;
+    my $headers_or=$r->{'headers_out'} ||= HTTP::Headers::Fast->new();
+    return @_ ? $headers_or->header(@_) : $headers_or;
 }
 
 
@@ -481,7 +476,6 @@ use WebDyne::Request::PAGI;
 my $wr = WebDyne::Request::PAGI->new(
     scope => $scope,
     req   => $pagi_request,
-    res   => $pagi_response,
 );
 ```
 
@@ -574,7 +568,6 @@ WebDyne::Request::PAGI - PAGI request adapter for WebDyne
  my $wr = WebDyne::Request::PAGI->new(
      scope => $scope,
      req   => $pagi_request,
-     res   => $pagi_response,
  );
 
 =head1 DESCRIPTION
