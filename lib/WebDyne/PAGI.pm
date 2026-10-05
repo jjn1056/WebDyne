@@ -35,8 +35,10 @@ use Scalar::Util qw(blessed reftype);
 use Encode qw(encode FB_CROAK);
 
 
-#  PAGI modules
+#  PAGI modules. The adapter relies on the PAGI-Tools 0.002003 API (PAGI Www
+#  0.6); fail at load time on an older install rather than mid-request.
 #
+use PAGI::Tools 0.002003 ();
 use PAGI::Request;
 
 
