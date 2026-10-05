@@ -314,7 +314,7 @@ sub env {
 
 
 sub id {
-    return shift()->{'scope'}{'request_id'};
+    return shift()->{'scope'}{'pagi.request_id'};
 }
 
 
@@ -497,7 +497,7 @@ Like the PSGI adapter, it can derive a target filename from the request path, co
 
 * **id()**
 
-    Return the request identifier if present.
+    Return the request identifier if present: the `pagi.request_id` that PAGI's RequestId middleware assigns.
 
 * **https() / secure()**
 
@@ -601,7 +601,7 @@ Return the normalized environment view used by the adapter.
 
 B<id()>
 
-Return the request identifier if present.
+Return the request identifier if present: the C<pagi.request_id> that PAGI's RequestId middleware assigns.
 
 
 

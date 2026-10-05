@@ -37,7 +37,7 @@ Like the PSGI adapter, it can derive a target filename from the request path, co
 
 * **id()**
 
-    Return the request identifier if present.
+    Return the request identifier if present: the `pagi.request_id` that PAGI's RequestId middleware assigns.
 
 * **https() / secure()**
 
