@@ -300,7 +300,7 @@ sub handler_sse {
             unless ($size > $WEBDYNE_CGI_POST_MAX) {
                 $size=0;
                 my $read=eval { await $req_or->body(); 1 };
-                die $@ unless $read || $size > $WEBDYNE_CGI_POST_MAX;
+                die $@ unless $read || $disconnected || $size > $WEBDYNE_CGI_POST_MAX;
             }
             if ($size > $WEBDYNE_CGI_POST_MAX) {
                 await $send->({type => 'sse.http.response.start', status => HTTP_REQUEST_ENTITY_TOO_LARGE,
@@ -520,7 +520,7 @@ sub handler_http {
                 }
                 1;
             };
-            die $@ unless $staged || $body_oversize;
+            die $@ unless $staged || $body_oversize || $body_disconnected;
         }
         if ($body_oversize) {
             return await send_http_response($send, HTTP_REQUEST_ENTITY_TOO_LARGE,
@@ -528,8 +528,8 @@ sub handler_http {
                 "Request body exceeds upload limit\n");
         }
 
-        #  PAGI's helpers may return partial bytes on disconnect. Never run
-        #  page code with an incomplete upload or synthesize a response for it.
+        #  PAGI's body helpers fail when the client disconnects mid-body. Never
+        #  run page code with an incomplete upload or synthesize a response for it.
         #
         return if $body_disconnected;
 
