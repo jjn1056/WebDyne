@@ -5,7 +5,7 @@ use warnings;
 use Exporter qw(import);
 
 our @EXPORT_OK=qw(pagi_skip_reason);
-our $MIN_PAGI_VERSION='0.002003';
+our $MIN_PAGI_VERSION='0.003000';
 
 sub pagi_skip_reason {
     my @module=@_ ? @_ : qw(PAGI::Request PAGI::Response PAGI::Test::Client Future::AsyncAwait);
