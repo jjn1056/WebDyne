@@ -305,8 +305,10 @@ sub handler_sse {
                 die $@ unless $read || $disconnected || $size > $WEBDYNE_CGI_POST_MAX;
             }
             if ($size > $WEBDYNE_CGI_POST_MAX) {
-                return await send_http_response($send, HTTP_REQUEST_ENTITY_TOO_LARGE,
-                    [['content-type', 'text/plain']], "Request body exceeds upload limit\n");
+                await $send->({type => 'http.response.start', status => HTTP_REQUEST_ENTITY_TOO_LARGE,
+                    headers => [['content-type', 'text/plain']]});
+                await $send->({type => 'http.response.body', body => "Request body exceeds upload limit\n", more => 0});
+                return;
             }
             return if $disconnected;
         }
@@ -340,8 +342,15 @@ sub handler_sse {
             $status=HTTP_INTERNAL_SERVER_ERROR
                 unless defined($status) && $status =~ /\A[45][0-9]{2}\z/;
             my $message=HTTP::Status::status_message($status) || 'Request failed';
-            return await send_http_response($send, $status,
-                [['content-type', 'text/plain']], "$status $message\n");
+            await $send->({
+                type => 'http.response.start', status => $status,
+                headers => [['content-type', 'text/plain']],
+            });
+            await $send->({
+                type => 'http.response.body',
+                body => "$status $message\n", more => 0,
+            });
+            return;
         }
         await $sse_cr->($scope, $receive, $send);
     };
@@ -430,8 +439,9 @@ sub handler_ws {
     #
     return async sub {
         my ($scope, $receive, $send)=@_;
-        await send_http_response($send, HTTP_FORBIDDEN,
-            [['content-type', 'text/plain']], "403 Forbidden\n");
+        await $send->({type => 'http.response.start', status => HTTP_FORBIDDEN,
+            headers => [['content-type', 'text/plain']]});
+        await $send->({type => 'http.response.body', body => "403 Forbidden\n", more => 0});
     };
 
 }
@@ -517,9 +527,10 @@ sub handler_http {
             die $@ unless $staged || $body_oversize || $body_disconnected;
         }
         if ($body_oversize) {
-            return await send_http_response($send, HTTP_REQUEST_ENTITY_TOO_LARGE,
-                [['content-type', 'text/plain; charset=utf-8']],
-                "Request body exceeds upload limit\n");
+            await $send->({type => 'http.response.start', status => HTTP_REQUEST_ENTITY_TOO_LARGE,
+                headers => [['content-type', 'text/plain; charset=utf-8']]});
+            await $send->({type => 'http.response.body', body => "Request body exceeds upload limit\n", more => 0});
+            return;
         }
 
         #  PAGI's body helpers fail when the client disconnects mid-body. Never
@@ -681,7 +692,11 @@ sub handler_http {
                 unless $content_type_ar->[1]=~/charset=/i
                     || $content_type_ar->[1]=~m{\A\s*(?:application/json|[^;]*\+json)\s*(?:;|\z)}i;
         }
-        my $respond_or=send_http_response($send, $final_status, \@header, $body);
+        @header=grep { $_->[0] ne 'content-length' && $_->[0] ne 'transfer-encoding' } @header;
+        push @header, ['content-length', length($body)];
+        my $start_or=$send->({type => 'http.response.start', status => $final_status, headers => \@header});
+        await $start_or;
+        my $respond_or=$send->({type => 'http.response.body', body => $body, more => 0});
 
         #  Retain the response Future across await. Awaiting the temporary can
         #  crash Devel::Confess stack tracing on send failure with Perl 5.38.
@@ -766,20 +781,6 @@ sub handler_lifespan {
 #  body bytes; a supplied Content-Length or Transfer-Encoding is dropped, since
 #  either one disagreeing with the body would corrupt the response.
 #
-async sub send_http_response {
-
-    my ($send, $status, $header_ar, $body)=@_;
-    my @header=grep {
-        $_->[0] ne 'content-length' && $_->[0] ne 'transfer-encoding'
-    } @{$header_ar};
-    push @header, ['content-length', length($body)];
-    await $send->({type => 'http.response.start', status => $status, headers => \@header});
-    await $send->({type => 'http.response.body', body => $body, more => 0});
-    return;
-
-}
-
-
 async sub lifespan_callback {
 
     my ($self, $phase, $scope_hr)=@_;
