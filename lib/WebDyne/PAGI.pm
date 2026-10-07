@@ -658,8 +658,8 @@ sub handler_http {
         debug("final handler status: %s, content_type: %s, html:%s", $final_status, $r->content_type(), $html);
         
         
-        #  Response headers come from headers_out, keeping order and
-        #  duplicates such as Set-Cookie. PAGI requires lowercase names.
+        #  Send headers unless already sent. PAGI requires lowercase names;
+        #  order and duplicates such as Set-Cookie are kept.
         #
         my $headers_ar=$r->headers_out->psgi_flatten_without_sort();
         debug('sending headers: %s', Dumper($headers_ar));
@@ -667,22 +667,21 @@ sub handler_http {
         for (my $i=0; $i<@{$headers_ar}; $i+=2) {
             push @header, [lc($headers_ar->[$i]), $headers_ar->[$i+1]];
         }
-
-
-        #  If html is defined set the content type, defaulting to HTML. An API
-        #  page with no matching route legitimately returns an empty 200
-        #  response; PAGI still requires response.start to be emitted then.
+        
+        
+        #  If html is defined set header content type unless already set during
+        #  handler execution, then always send the response. An API page with
+        #  no matching route legitimately returns an empty 200 response; PAGI
+        #  still requires response.start to be emitted in that case.
         #
         my $body=$html || '';
         if ($body) {
-            debug('sending html to client');
+            debug('sending html to client via await()');
             @header=grep { $_->[0] ne 'content-type' } @header;
             push @header, ['content-type', $r->content_type() || $WEBDYNE_CONTENT_TYPE_HTML];
         }
 
-
-        #  Encode character strings as UTF-8 and say so in the content type,
-        #  but preserve byte strings from files and R2.
+        #  Encode character strings, but preserve byte strings from files and R2.
         #
         if (utf8::is_utf8($body)) {
             $body=encode('UTF-8', $body, FB_CROAK);
@@ -777,10 +776,6 @@ sub handler_lifespan {
 }
 
 
-#  Send a complete buffered HTTP response. Content-Length is computed from the
-#  body bytes; a supplied Content-Length or Transfer-Encoding is dropped, since
-#  either one disagreeing with the body would corrupt the response.
-#
 async sub lifespan_callback {
 
     my ($self, $phase, $scope_hr)=@_;
